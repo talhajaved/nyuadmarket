@@ -264,3 +264,8 @@ def search_results(query):
     return render_template('search_results.html',
                            query=query,
                            results=results)
+
+@app.route('/post/<int:id>')
+def post(id):
+    post = Post.query.get_or_404(id)
+    return render_template('post.html', post=post)

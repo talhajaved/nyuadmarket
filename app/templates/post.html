@@ -1,5 +1,11 @@
 <table>
     <tr valign="top">
-        <td><img src="{{ post.author.avatar(50) }}"></td><td><i>{{ post.author.nickname }} says:</i><br>{{ post.body }}</td>
+        <td><img src="{{ post.author.avatar(50) }}"></td><td><i><a href="{{ url_for('.user', nickname=post.author.nickname) }}">{{ post.author.nickname }}</td>
+        <td>says:</i><br>{{ post.body }}</td>
     </tr>
 </table>
+<div class="post-footer">
+    <a href="{{ url_for('.post', id=post.id) }}">
+        <span class="label label-default">Permalink</span>
+    </a>
+</div>
