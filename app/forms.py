@@ -36,3 +36,6 @@ class PostForm(Form):
 
 class SearchForm(Form):
     search = StringField('search', validators=[DataRequired()])
+
+class CommentForm(Form):
+    comment = StringField('comment', validators=[DataRequired()])
