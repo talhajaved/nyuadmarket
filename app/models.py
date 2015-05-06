@@ -99,6 +99,9 @@ class Post(db.Model):
     def __repr__(self):
         return '<Post %r>' % (self.body)
 
+    def post_comments(self):
+        return Comment.query.join()
+
 
 if enable_search:
     whooshalchemy.whoosh_index(app, Post)

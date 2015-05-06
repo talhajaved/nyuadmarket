@@ -4,9 +4,9 @@ from flask.ext.login import login_user, logout_user, current_user, \
 from datetime import datetime
 from app import app, db, lm, oid
 from app import oauthLogin
-from .forms import LoginForm, EditForm, PostForm, SearchForm
-from .models import User, Post
-from config import POSTS_PER_PAGE, MAX_SEARCH_RESULTS, AUTHORIZED_GROUPS
+from .forms import LoginForm, EditForm, PostForm, SearchForm, CommentForm
+from .models import User, Post, Comment
+from config import POSTS_PER_PAGE, MAX_SEARCH_RESULTS, AUTHORIZED_GROUPS, COMMENTS_PER_PAGE
 from authomatic.adapters import WerkzeugAdapter
 from authomatic import Authomatic
 from datetime import datetime
@@ -160,6 +160,8 @@ def login(provider_name='nyuad'):
                 user = User(nickname = result.user.NetID, email = result.user.NetID + "@nyu.edu")
                 db.session.add(user)
                 db.session.commit()
+                db.session.add(user.follow(user))
+                db.session.commit()
             
             login_user(user)
             flash("You were logged in successfully.", "success")
@@ -265,7 +267,49 @@ def search_results(query):
                            query=query,
                            results=results)
 
-@app.route('/post/<int:id>')
-def post(id):
+
+@app.route('/post/<int:id>', methods=['GET', 'POST'])
+@app.route('/post/<int:id>/<int:page>', methods=['GET', 'POST'])
+@login_required
+def post(id, page = 1):
     post = Post.query.get_or_404(id)
-    return render_template('post.html', post=post)
+    form = CommentForm()
+    if form.validate_on_submit():
+        comment = Comment(body=form.comment.data, timestamp=datetime.utcnow(),
+                    author=g.user, post=post )
+        db.session.add(comment)
+        db.session.commit()
+        flash('Your comment is now live!')
+        return redirect(url_for('.post', id=post.id))
+    comments = post.comments.paginate(page, COMMENTS_PER_PAGE, False)
+    
+    return render_template('single_post.html', post = post, form = form, comments = comments)
+
+    # form = PostForm()
+    # if form.validate_on_submit():
+    #     post = Post(body=form.post.data, timestamp=datetime.utcnow(),
+    #                 author=g.user)
+    #     db.session.add(post)
+    #     db.session.commit()
+    #     flash('Your post is now live!')
+    #     return redirect(url_for('index'))
+    # posts = g.user.followed_posts().paginate(page, POSTS_PER_PAGE, False)
+    # return render_template('index.html',
+    #                        title='Home',
+    #                        form=form,
+    #                        posts=posts)
+    
+
+   
+
+    # page = request.args.get('page', 1, type=int)
+    # if page == -1:
+    #     page = (post.comments.count() - 1) / \
+    #         app.config['COMMENTS_PER_PAGE'] + 1
+    # pagination = post.comments.order_by(Comment.timestamp.asc()).paginate(
+    #     page, per_page=app.config['COMMENTS_PER_PAGE'],
+    #     error_out=False)
+    # comments = pagination.items
+    # return render_template('single_post.html', post=post, form=form,
+    #                        comments=comments, pagination=pagination)
+
