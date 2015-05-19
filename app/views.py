@@ -37,16 +37,6 @@ def before_request():
         g.search_form = SearchForm()
 
 
-@app.errorhandler(404)
-def not_found_error(error):
-    return render_template('404.html'), 404
-
-
-@app.errorhandler(500)
-def internal_error(error):
-    db.session.rollback()
-    return render_template('500.html'), 500
-
 @app.route('/')
 @app.route('/landing')
 def landing():
@@ -253,21 +243,40 @@ def unfollow(nickname):
 
 
 
-@app.route('/post/<int:id>', methods=['GET', 'POST'])
-@app.route('/post/<int:id>/<int:page>', methods=['GET', 'POST'])
+@main.route('/post/<int:id>', methods=['GET', 'POST'])
 @login_required
-def post(id, page = 1):
+def post(id):
     post = Post.query.get_or_404(id)
     form = CommentForm()
     if form.validate_on_submit():
-        comment = Comment(body=form.comment.data, timestamp=datetime.utcnow(),
-                    author=g.user, post=post )
+        comment = Comment(body=form.body.data,
+                          post=post,
+                          author=current_user._get_current_object())
         db.session.add(comment)
-        db.session.commit()
-        flash('Your comment is now live!')
-        return redirect(url_for('.post', id=post.id))
-    comments = post.comments.paginate(page, COMMENTS_PER_PAGE, False)
-    
-    return render_template('single_post.html', post = post, form = form, comments = comments)
+        flash('Your comment has been published.')
+        return redirect(url_for('.post', id=post.id, page=-1))
+    page = request.args.get('page', 1, type=int)
+    if page == -1:
+        page = (post.comments.count() - 1) / \
+            current_app.config['NYUAD_MARKET_COMMENTS_PER_PAGE'] + 1
+    pagination = post.comments.order_by(Comment.timestamp.asc()).paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_COMMENTS_PER_PAGE'],
+        error_out=False)
+    comments = pagination.items
+    return render_template('post.html', posts=[post], form=form,
+                           comments=comments, pagination=pagination)
 
-   
+@main.route('/new-post', methods=['GET', 'POST'])
+@login_required
+def new_post():
+    if not current_user.can(Permission.WRITE_ARTICLES):
+        abort(403)
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(item= form.item.data, body=form.body.data, category=form.category.data, price=form.price.data, 
+                    contact=form.contact.data, author=current_user._get_current_object(), sold = False)
+        db.session.add(post)
+        db.session.commit()
+        flash('The post has been added.')
+        return redirect(url_for('.post', id=post.id))
+    return render_template('new_post.html', form=form)
