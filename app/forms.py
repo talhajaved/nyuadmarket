@@ -30,3 +30,7 @@ class PostForm(Form):
     sold = BooleanField('Sold?')
     body = PageDownField("Post", validators=[Required()])
     submit = SubmitField('Submit')
+
+class CommentForm(Form):
+    body = PageDownField('Enter your comment', validators=[Required()])
+    submit = SubmitField('Submit')
