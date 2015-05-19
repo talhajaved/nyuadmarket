@@ -56,6 +56,19 @@ class EditProfileAdminForm(Form):
 
 class PostForm(Form):
     item = StringField('Item', validators=[Required(),Length(1, 64)])
+    category = SelectField('Category', choices=[('Beddings','Beddings'), 
+        ('Books', 'Books'), 
+        ('Clothings', 'Clothings'), 
+        ('Currency','Currency'),
+        ('Electronics','Electronics'),
+        ('Equipment','Equipment'),
+        ('Food', 'Food'),  
+        ('Furniture','Furniture'),
+        ('Stationery', 'Stationery'),
+        ('Other','Other'), 
+        ('Utensils','Utensils'),
+        ('Virtual','Virtual')
+        ])
     price = StringField('Price', validators=[Required(),Length(1, 64)])
     contact = StringField('Contact Info', validators=[Required(), Length(1, 64)])
     sold = BooleanField('Sold?')
