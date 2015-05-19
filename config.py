@@ -8,6 +8,7 @@ class Config:
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     SQLALCHEMY_RECORD_QUERIES = True
     NYUAD_MARKET_ADMIN = "tj626@nyu.edu"
+    NYUAD_MARKET_POSTS_PER_PAGE = 20
     NYUAD_MARKET_FOLLOWERS_PER_PAGE = 50
     NYUAD_MARKET_COMMENTS_PER_PAGE = 30
     NYUAD_MARKET_SLOW_DB_QUERY_TIME=0.5
@@ -30,6 +31,14 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
 
 
+class ProductionConfig(Config):
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+
+    @classmethod
+    def init_app(cls, app):
+        Config.init_app(app)
+
 
 class HerokuConfig(ProductionConfig):
     SSL_DISABLE = bool(os.environ.get('SSL_DISABLE'))
@@ -51,6 +60,9 @@ class HerokuConfig(ProductionConfig):
 
 
 config = {
+    'development': DevelopmentConfig,
+    'testing': TestingConfig,
+    'production': ProductionConfig,
     'heroku': HerokuConfig,
 
     'default': DevelopmentConfig
