@@ -2,13 +2,6 @@ from hashlib import md5
 from app import db
 from app import app
 
-import sys
-if sys.version_info >= (3, 0):
-    enable_search = False
-else:
-    enable_search = True
-    import flask.ext.whooshalchemy as whooshalchemy
-
 
 followers = db.Table(
     'followers',
@@ -103,8 +96,6 @@ class Post(db.Model):
         return Comment.query.join()
 
 
-if enable_search:
-    whooshalchemy.whoosh_index(app, Post)
 
 
 class Comment(db.Model):
