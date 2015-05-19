@@ -81,19 +81,18 @@ class User(db.Model):
 
 
 class Post(db.Model):
-    __searchable__ = ['body']
-
+    __tablename__ = 'posts'
     id = db.Column(db.Integer, primary_key=True)
-    body = db.Column(db.String(140))
-    timestamp = db.Column(db.DateTime)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    item = db.Column(db.Text)
+    category = db.Column(db.Text)
+    price = db.Column(db.Text)
+    contact = db.Column(db.Text)
+    sold = db.Column(db.Boolean, default=False)
+    body = db.Column(db.Text)
+    body_html = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     comments = db.relationship('Comment', backref='post', lazy='dynamic')
-
-    def __repr__(self):
-        return '<Post %r>' % (self.body)
-
-    def post_comments(self):
-        return Comment.query.join()
 
 
 
