@@ -4,7 +4,6 @@ from flask.ext.login import login_user, logout_user, login_required, \
 from . import auth, oauthLogin
 from .. import db
 from ..models import User
-from ..email import send_email
 from authomatic.adapters import WerkzeugAdapter
 from authomatic import Authomatic
 
