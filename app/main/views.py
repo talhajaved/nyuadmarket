@@ -60,6 +60,33 @@ def user(nickname, page=1):
                            user=user,
                            posts=posts)
 
+@main.route('/category_list')
+@login_required
+def category_list():
+    category_list = ['Beddings',
+'Books',
+'Clothings',
+'Currency',
+'Electronics',
+'Equipment',
+'Food',
+'Furniture',
+'Other',
+'Stationery',
+'Utensils',
+'Virtual',]
+    return render_template('category_list.html', category_list=category_list)
+
+@main.route('/category/<category_name>')
+@login_required
+def category(category_name):
+    page = request.args.get('page', 1, type=int)
+    pagination = Post.query.filter_by(category=category_name).order_by(Post.timestamp.desc()).paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_POSTS_PER_PAGE'],
+        error_out=False)
+    posts = pagination.items
+    return render_template('category.html', category=category_name, posts=posts,
+                           pagination=pagination)
 
 @app.route('/edit', methods=['GET', 'POST'])
 @login_required
