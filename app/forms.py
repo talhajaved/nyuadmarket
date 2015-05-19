@@ -31,11 +31,9 @@ class EditForm(Form):
 
 
 class PostForm(Form):
-    post = StringField('post', validators=[DataRequired()])
-
-
-class SearchForm(Form):
-    search = StringField('search', validators=[DataRequired()])
-
-class CommentForm(Form):
-    comment = StringField('comment', validators=[DataRequired()])
+    item = StringField('Item', validators=[Required(),Length(1, 64)])
+    price = StringField('Price', validators=[Required(),Length(1, 64)])
+    contact = StringField('Contact Info', validators=[Required(), Length(1, 64)])
+    sold = BooleanField('Sold?')
+    body = PageDownField("Post", validators=[Required()])
+    submit = SubmitField('Submit')
