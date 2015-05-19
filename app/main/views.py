@@ -16,25 +16,6 @@ from datetime import datetime
 # Instantiate Authomatic.
 authomatic = Authomatic(oauthLogin.oauthconfig, '\x00\x18}{\x9b\xa4(\xaa\xf7[4\xd5Ko\x07S\x03#%_cM\xf2y.\xf6\xf00Kr', report_errors=False)
 
-lm.login_view = "landing"
-lm.login_message = "You must be logged in to view the requested page."
-lm.login_message_category = "error"
-
-
-
-@lm.user_loader
-def load_user(id):
-    return User.query.get(int(id))
-
-
-@app.before_request
-def before_request():
-    g.user = current_user
-    if g.user.is_authenticated():
-        g.user.last_seen = datetime.utcnow()
-        db.session.add(g.user)
-        db.session.commit()
-        g.search_form = SearchForm()
 
 
 @app.route('/')
@@ -64,110 +45,6 @@ def index(page=1):
                            title='Home',
                            form=form,
                            posts=posts)
-
-
-# @app.route('/login', methods=['GET', 'POST'])
-# @oid.loginhandler
-# def login():
-#     if g.user is not None and g.user.is_authenticated():
-#         return redirect(url_for('index'))
-#     form = LoginForm()
-#     if form.validate_on_submit():
-#         session['remember_me'] = form.remember_me.data
-#         return oid.try_login(form.openid.data, ask_for=['nickname', 'email'])
-#     return render_template('login.html',
-#                            title='Sign In',
-#                            form=form,
-#                            providers=app.config['OPENID_PROVIDERS'])
-
-
-@oid.after_login
-def after_login(resp):
-    if resp.email is None or resp.email == "":
-        flash('Invalid login. Please try again.')
-        return redirect(url_for('login'))
-    user = User.query.filter_by(email=resp.email).first()
-    if user is None:
-        nickname = resp.nickname
-        if nickname is None or nickname == "":
-            nickname = resp.email.split('@')[0]
-        nickname = User.make_unique_nickname(nickname)
-        user = User(nickname=nickname, email=resp.email)
-        db.session.add(user)
-        db.session.commit()
-        # make the user follow him/herself
-        db.session.add(user.follow(user))
-        db.session.commit()
-    remember_me = False
-    if 'remember_me' in session:
-        remember_me = session['remember_me']
-        session.pop('remember_me', None)
-    login_user(user, remember=remember_me)
-    return redirect(request.args.get('next') or url_for('index'))
-
-
-@app.route('/login', methods=['GET', 'POST'])     
-@app.route('/login/<provider_name>/', methods=['GET', 'POST'])    
-def login(provider_name='nyuad'):
-    """
-    Login handler, must accept both GET and POST to be able to use OpenID.
-    """
-    if g.user is not None and g.user.is_authenticated():
-        return redirect(url_for('index'))
-    
-    # We need response object for the WerkzeugAdapter.
-    response = make_response()
-    
-    # Log the user in, pass it the adapter and the provider name.
-    result = authomatic.login(WerkzeugAdapter(request, response), provider_name)
-   
-    
-    # If there is no LoginResult object, the login procedure is still pending.
-    if result:
-        if result.user:
-            # We need to update the user to get more info.
-            result.user.update()
-            #Check if passport returns an error, if so, that means the user is not a student, therefore we redirect the user to landing
-            if hasattr(result.user, "error"):
-                flash("Sorry, it seems that you are not a student, so you can't use NYUAD Coursereview.", "error")
-                return redirect(url_for('landing'))
-            #Check the user group, if belongs to any restricted group redirect login
-            for gr in result.user.groups:
-                print gr
-                if gr in AUTHORIZED_GROUPS:
-                    authorized = True
-                    break
-                else:
-                    authorized = False
-            authorized = True   
-            if not authorized:
-                flash("Sorry, it seems that you are not a student, so you can't use NYUAD Coursereview.", "error")
-                return redirect(url_for('landing'))
-            
-            #check if the user is in the database already
-            user = User.query.filter_by(nickname = result.user.NetID).first()
-            if user is None:
-                user = User(nickname = result.user.NetID, email = result.user.NetID + "@nyu.edu")
-                db.session.add(user)
-                db.session.commit()
-                db.session.add(user.follow(user))
-                db.session.commit()
-            
-            login_user(user)
-            flash("You were logged in successfully.", "success")
-        # The rest happens inside the template.
-        return redirect(url_for('index'))
-    
-    # Don't forget to return the response.
-    return response
-
-
-
-
-@app.route('/logout')
-def logout():
-    logout_user()
-    return redirect('http://passport.sg.nyuad.org/auth/logout')#logout with passport
 
 
 @app.route('/user/<nickname>')
@@ -301,4 +178,38 @@ def edit(id):
     form.contact.data = post.contact
     form.sold.data = post.sold
     return render_template('edit_post.html', form=form)
+
+@main.route('/moderate')
+@login_required
+@permission_required(Permission.MODERATE_COMMENTS)
+def moderate():
+    page = request.args.get('page', 1, type=int)
+    pagination = Comment.query.order_by(Comment.timestamp.desc()).paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_COMMENTS_PER_PAGE'],
+        error_out=False)
+    comments = pagination.items
+    return render_template('moderate.html', comments=comments,
+                           pagination=pagination, page=page)
+
+
+@main.route('/moderate/enable/<int:id>')
+@login_required
+@permission_required(Permission.MODERATE_COMMENTS)
+def moderate_enable(id):
+    comment = Comment.query.get_or_404(id)
+    comment.disabled = False
+    db.session.add(comment)
+    return redirect(url_for('.moderate',
+                            page=request.args.get('page', 1, type=int)))
+
+
+@main.route('/moderate/disable/<int:id>')
+@login_required
+@permission_required(Permission.MODERATE_COMMENTS)
+def moderate_disable(id):
+    comment = Comment.query.get_or_404(id)
+    comment.disabled = True
+    db.session.add(comment)
+    return redirect(url_for('.moderate',
+                            page=request.args.get('page', 1, type=int)))
 
