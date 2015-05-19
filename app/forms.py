@@ -4,18 +4,11 @@ from wtforms.validators import DataRequired, Length
 from .models import User
 
 
-class LoginForm(Form):
-    openid = StringField('openid', validators=[DataRequired()])
-    remember_me = BooleanField('remember_me', default=False)
-
-
-class EditForm(Form):
-    nickname = StringField('nickname', validators=[DataRequired()])
-    about_me = TextAreaField('about_me', validators=[Length(min=0, max=140)])
-
-    def __init__(self, original_nickname, *args, **kwargs):
-        Form.__init__(self, *args, **kwargs)
-        self.original_nickname = original_nickname
+class EditProfileForm(Form):
+    name = StringField('Real name', validators=[Length(0, 64)])
+    location = StringField('Location', validators=[Length(0, 64)])
+    about_me = TextAreaField('About me')
+    submit = SubmitField('Submit')
 
     def validate(self):
         if not Form.validate(self):
