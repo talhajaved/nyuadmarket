@@ -251,21 +251,6 @@ def unfollow(nickname):
     return redirect(url_for('user', nickname=nickname))
 
 
-@app.route('/search', methods=['POST'])
-@login_required
-def search():
-    if not g.search_form.validate_on_submit():
-        return redirect(url_for('index'))
-    return redirect(url_for('search_results', query=g.search_form.search.data))
-
-
-@app.route('/search_results/<query>')
-@login_required
-def search_results(query):
-    results = Post.query.whoosh_search(query, MAX_SEARCH_RESULTS).all()
-    return render_template('search_results.html',
-                           query=query,
-                           results=results)
 
 
 @app.route('/post/<int:id>', methods=['GET', 'POST'])
@@ -285,31 +270,4 @@ def post(id, page = 1):
     
     return render_template('single_post.html', post = post, form = form, comments = comments)
 
-    # form = PostForm()
-    # if form.validate_on_submit():
-    #     post = Post(body=form.post.data, timestamp=datetime.utcnow(),
-    #                 author=g.user)
-    #     db.session.add(post)
-    #     db.session.commit()
-    #     flash('Your post is now live!')
-    #     return redirect(url_for('index'))
-    # posts = g.user.followed_posts().paginate(page, POSTS_PER_PAGE, False)
-    # return render_template('index.html',
-    #                        title='Home',
-    #                        form=form,
-    #                        posts=posts)
-    
-
    
-
-    # page = request.args.get('page', 1, type=int)
-    # if page == -1:
-    #     page = (post.comments.count() - 1) / \
-    #         app.config['COMMENTS_PER_PAGE'] + 1
-    # pagination = post.comments.order_by(Comment.timestamp.asc()).paginate(
-    #     page, per_page=app.config['COMMENTS_PER_PAGE'],
-    #     error_out=False)
-    # comments = pagination.items
-    # return render_template('single_post.html', post=post, form=form,
-    #                        comments=comments, pagination=pagination)
-
