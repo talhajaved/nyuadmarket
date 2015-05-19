@@ -1,11 +1,19 @@
-<table>
-    <tr valign="top">
-        <td><img src="{{ post.author.avatar(50) }}"></td><td><i><a href="{{ url_for('.user', nickname=post.author.nickname) }}">{{ post.author.nickname }}</td>
-        <td>says:</i><br>{{ post.body }}</td>
-    </tr>
-</table>
-<div class="post-footer">
-    <a href="{{ url_for('.post', id=post.id) }}">
-        <span class="label label-default">Permalink</span>
-    </a>
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "_macros.html" as macros %}
+
+{% block title %}NYUAD Market - Post{% endblock %}
+
+{% block page_content %}
+{% include '_posts.html' %}
+<h4 id="comments">Comments</h4>
+<div class="comment-form">
+    {{ wtf.quick_form(form) }}
 </div>
+{% include '_comments.html' %}
+{% if pagination %}
+<div class="pagination">
+    {{ macros.pagination_widget(pagination, '.post', fragment='#comments', id=posts[0].id) }}
+</div>
+{% endif %}
+{% endblock %}

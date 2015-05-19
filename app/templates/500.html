@@ -1,8 +1,9 @@
-<!-- extend base layout -->
 {% extends "base.html" %}
 
-{% block content %}
-    <h1>An unexpected error has occurred</h1>
-    <p>The administrator has been notified. Sorry for the inconvenience!</p>
-    <p><a href="{{ url_for('index') }}">Back</a></p>
+{% block title %}NYUAD Market - Internal Server Error{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <h1>Internal Server Error</h1>
+</div>
 {% endblock %}

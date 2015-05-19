@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+
+{% block title %}NYUAD Market - Categories{% endblock %}
+
+{% block page_content %}
+<h3>Categories List</h3>
+{% for temp_category in category_list %}
+<a href="{{ url_for('.category', category_name=temp_category) }}">{{ temp_category }}</a><br>
+{% endfor %}
+{% endblock %}
+
