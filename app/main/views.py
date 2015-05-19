@@ -1,64 +1,55 @@
-from flask import render_template, flash, redirect, session, url_for, request, g, make_response
-from flask.ext.login import login_user, logout_user, current_user, \
-    login_required
-from datetime import datetime
-from app import app, db, lm, oid
-from app import oauthLogin
-from .forms import LoginForm, EditForm, PostForm, SearchForm, CommentForm
-from .models import User, Post, Comment
-from config import POSTS_PER_PAGE, MAX_SEARCH_RESULTS, AUTHORIZED_GROUPS, COMMENTS_PER_PAGE
-from authomatic.adapters import WerkzeugAdapter
-from authomatic import Authomatic
-from datetime import datetime
+from flask import render_template, redirect, url_for, abort, flash, request,\
+    current_app, make_response
+from flask.ext.login import login_required, current_user
+from . import main
+from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
+    CommentForm
+from .. import db
+from ..models import Permission, Role, User, Post, Comment
+from ..decorators import admin_required, permission_required 
 
 
-
-# Instantiate Authomatic.
-authomatic = Authomatic(oauthLogin.oauthconfig, '\x00\x18}{\x9b\xa4(\xaa\xf7[4\xd5Ko\x07S\x03#%_cM\xf2y.\xf6\xf00Kr', report_errors=False)
-
-
-
-@app.route('/')
-@app.route('/landing')
+@main.route('/')
+@main.route('/landing')
 def landing():
-    if g.user.is_authenticated():
-        return redirect(url_for('index'))
-    # next_url = request.args.get('next')
-    # cache.set('next_url', next_url, 60)
+    if current_user.is_authenticated():
+        return redirect(url_for('main.index'))
     return render_template('landing.html', title ="Welcome")
 
+@main.route('/about')
+def about():
+    return render_template('about.html', title ="About")
 
-@app.route('/index', methods=['GET', 'POST'])
-@app.route('/index/<int:page>', methods=['GET', 'POST'])
+@main.route('/index', methods=['GET', 'POST'])
 @login_required
-def index(page=1):
-    form = PostForm()
-    if form.validate_on_submit():
-        post = Post(body=form.post.data, timestamp=datetime.utcnow(),
-                    author=g.user)
-        db.session.add(post)
-        db.session.commit()
-        flash('Your post is now live!')
-        return redirect(url_for('index'))
-    posts = g.user.followed_posts().paginate(page, POSTS_PER_PAGE, False)
-    return render_template('index.html',
-                           title='Home',
-                           form=form,
-                           posts=posts)
+def index():
+    page = request.args.get('page', 1, type=int)
+    show_followed = False
+    if current_user.is_authenticated():
+        show_followed = bool(request.cookies.get('show_followed', ''))
+    if show_followed:
+        query = current_user.followed_posts
+    else:
+        query = Post.query
+    pagination = query.order_by(Post.timestamp.desc()).paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_POSTS_PER_PAGE'],
+        error_out=False)
+    posts = pagination.items
+    return render_template('index.html', posts=posts,
+                           show_followed=show_followed, pagination=pagination)
 
 
-@app.route('/user/<nickname>')
-@app.route('/user/<nickname>/<int:page>')
+@main.route('/user/<username>')
 @login_required
-def user(nickname, page=1):
-    user = User.query.filter_by(nickname=nickname).first()
-    if user is None:
-        flash('User %s not found.' % nickname)
-        return redirect(url_for('index'))
-    posts = user.posts.paginate(page, POSTS_PER_PAGE, False)
-    return render_template('user.html',
-                           user=user,
-                           posts=posts)
+def user(username):
+    user = User.query.filter_by(username=username).first_or_404()
+    page = request.args.get('page', 1, type=int)
+    pagination = user.posts.order_by(Post.timestamp.desc()).paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_POSTS_PER_PAGE'],
+        error_out=False)
+    posts = pagination.items
+    return render_template('user.html', user=user, posts=posts,
+                           pagination=pagination)
 
 @main.route('/category_list')
 @login_required
@@ -88,85 +79,50 @@ def category(category_name):
     return render_template('category.html', category=category_name, posts=posts,
                            pagination=pagination)
 
-@app.route('/edit', methods=['GET', 'POST'])
+
+@main.route('/edit-profile', methods=['GET', 'POST'])
 @login_required
-def edit():
-    form = EditForm(g.user.nickname)
+def edit_profile():
+    form = EditProfileForm()
     if form.validate_on_submit():
-        g.user.nickname = form.nickname.data
-        g.user.about_me = form.about_me.data
-        db.session.add(g.user)
-        db.session.commit()
-        flash('Your changes have been saved.')
-        return redirect(url_for('edit'))
-    elif request.method != "POST":
-        form.nickname.data = g.user.nickname
-        form.about_me.data = g.user.about_me
-    return render_template('edit.html', form=form)
+        current_user.name = form.name.data
+        current_user.location = form.location.data
+        current_user.about_me = form.about_me.data
+        db.session.add(current_user)
+        flash('Your profile has been updated.')
+        return redirect(url_for('.user', username=current_user.username))
+    form.name.data = current_user.name
+    form.location.data = current_user.location
+    form.about_me.data = current_user.about_me
+    return render_template('edit_profile.html', form=form)
 
-@main.route('/edit/<int:id>', methods=['GET', 'POST'])
+
+@main.route('/edit-profile/<int:id>', methods=['GET', 'POST'])
 @login_required
-def edit(id):
-    post = Post.query.get_or_404(id)
-    if current_user != post.author and \
-            not current_user.can(Permission.ADMINISTER):
-        abort(403)
-    form = PostForm()
+@admin_required
+def edit_profile_admin(id):
+    user = User.query.get_or_404(id)
+    form = EditProfileAdminForm(user=user)
     if form.validate_on_submit():
-        post.item = form.item.data
-        post.body = form.body.data
-        post.price = form.price.data
-        post.contact = form.contact.data
-        post.sold = form.sold.data
-        db.session.add(post)
-        flash('The post has been updated.')
-        return redirect(url_for('.post', id=post.id))
-    form.item.data = post.item
-    form.body.data = post.body
-    form.price.data = post.price
-    form.contact.data = post.contact
-    form.sold.data = post.sold
-    return render_template('edit_post.html', form=form)
+        user.email = form.email.data
+        user.username = form.username.data
+        user.confirmed = form.confirmed.data
+        user.role = Role.query.get(form.role.data)
+        user.name = form.name.data
+        user.location = form.location.data
+        user.about_me = form.about_me.data
+        db.session.add(user)
+        flash('The profile has been updated.')
+        return redirect(url_for('.user', username=user.username))
+    form.email.data = user.email
+    form.username.data = user.username
+    form.confirmed.data = user.confirmed
+    form.role.data = user.role_id
+    form.name.data = user.name
+    form.location.data = user.location
+    form.about_me.data = user.about_me
+    return render_template('edit_profile.html', form=form, user=user)
 
-
-@app.route('/follow/<nickname>')
-@login_required
-def follow(nickname):
-    user = User.query.filter_by(nickname=nickname).first()
-    if user is None:
-        flash('User %s not found.' % nickname)
-        return redirect(url_for('index'))
-    if user == g.user:
-        flash('You can\'t follow yourself!')
-        return redirect(url_for('user', nickname=nickname))
-    u = g.user.follow(user)
-    if u is None:
-        flash('Cannot follow ' + nickname + '.')
-        return redirect(url_for('user', nickname=nickname))
-    db.session.add(u)
-    db.session.commit()
-    flash('You are now following ' + nickname + '!')
-    return redirect(url_for('user', nickname=nickname))
-
-
-@app.route('/unfollow/<nickname>')
-@login_required
-def unfollow(nickname):
-    user = User.query.filter_by(nickname=nickname).first()
-    if user is None:
-        flash('User %s not found.' % nickname)
-        return redirect(url_for('index'))
-    if user == g.user:
-        flash('You can\'t unfollow yourself!')
-        return redirect(url_for('user', nickname=nickname))
-    u = g.user.unfollow(user)
-    if u is None:
-        flash('Cannot unfollow ' + nickname + '.')
-        return redirect(url_for('user', nickname=nickname))
-    db.session.add(u)
-    db.session.commit()
-    flash('You have stopped following ' + nickname + '.')
-    return redirect(url_for('user', nickname=nickname))
 
 @main.route('/post/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -206,6 +162,115 @@ def new_post():
         return redirect(url_for('.post', id=post.id))
     return render_template('new_post.html', form=form)
 
+@main.route('/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit(id):
+    post = Post.query.get_or_404(id)
+    if current_user != post.author and \
+            not current_user.can(Permission.ADMINISTER):
+        abort(403)
+    form = PostForm()
+    if form.validate_on_submit():
+        post.item = form.item.data
+        post.body = form.body.data
+        post.price = form.price.data
+        post.contact = form.contact.data
+        post.sold = form.sold.data
+        db.session.add(post)
+        flash('The post has been updated.')
+        return redirect(url_for('.post', id=post.id))
+    form.item.data = post.item
+    form.body.data = post.body
+    form.price.data = post.price
+    form.contact.data = post.contact
+    form.sold.data = post.sold
+    return render_template('edit_post.html', form=form)
+
+
+@main.route('/follow/<username>')
+@login_required
+@permission_required(Permission.FOLLOW)
+def follow(username):
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        flash('Invalid user.')
+        return redirect(url_for('.index'))
+    if current_user.is_following(user):
+        flash('You are already following this user.')
+        return redirect(url_for('.user', username=username))
+    current_user.follow(user)
+    flash('You are now following %s.' % username)
+    return redirect(url_for('.user', username=username))
+
+
+@main.route('/unfollow/<username>')
+@login_required
+@permission_required(Permission.FOLLOW)
+def unfollow(username):
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        flash('Invalid user.')
+        return redirect(url_for('.index'))
+    if not current_user.is_following(user):
+        flash('You are not following this user.')
+        return redirect(url_for('.user', username=username))
+    current_user.unfollow(user)
+    flash('You are not following %s anymore.' % username)
+    return redirect(url_for('.user', username=username))
+
+
+@main.route('/followers/<username>')
+@login_required
+def followers(username):
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        flash('Invalid user.')
+        return redirect(url_for('.index'))
+    page = request.args.get('page', 1, type=int)
+    pagination = user.followers.paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_FOLLOWERS_PER_PAGE'],
+        error_out=False)
+    follows = [{'user': item.follower, 'timestamp': item.timestamp}
+               for item in pagination.items]
+    return render_template('followers.html', user=user, title="Followers of",
+                           endpoint='.followers', pagination=pagination,
+                           follows=follows)
+
+
+@main.route('/followed-by/<username>')
+@login_required
+def followed_by(username):
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        flash('Invalid user.')
+        return redirect(url_for('.index'))
+    page = request.args.get('page', 1, type=int)
+    pagination = user.followed.paginate(
+        page, per_page=current_app.config['NYUAD_MARKET_FOLLOWERS_PER_PAGE'],
+        error_out=False)
+    follows = [{'user': item.followed, 'timestamp': item.timestamp}
+               for item in pagination.items]
+    return render_template('followers.html', user=user, title="Followed by",
+                           endpoint='.followed_by', pagination=pagination,
+                           follows=follows)
+
+
+@main.route('/all')
+@login_required
+def show_all():
+    resp = make_response(redirect(url_for('.index')))
+    resp.set_cookie('show_followed', '', max_age=30*24*60*60)
+    return resp
+
+
+@main.route('/followed')
+@login_required
+def show_followed():
+    resp = make_response(redirect(url_for('.index')))
+    resp.set_cookie('show_followed', '1', max_age=30*24*60*60)
+    return resp
+
+
 @main.route('/moderate')
 @login_required
 @permission_required(Permission.MODERATE_COMMENTS)
@@ -239,4 +304,3 @@ def moderate_disable(id):
     db.session.add(comment)
     return redirect(url_for('.moderate',
                             page=request.args.get('page', 1, type=int)))
-
