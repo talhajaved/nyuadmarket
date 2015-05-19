@@ -1,7 +1,15 @@
 from flask.ext.wtf import Form
-from wtforms import StringField, BooleanField, TextAreaField
-from wtforms.validators import DataRequired, Length
-from .models import User
+from wtforms import StringField, TextAreaField, BooleanField, SelectField,\
+    SubmitField
+from wtforms.validators import Required, Length, Email, Regexp
+from wtforms import ValidationError
+from flask.ext.pagedown.fields import PageDownField
+from ..models import Role, User
+
+
+class NameForm(Form):
+    name = StringField('What is your name?', validators=[Required()])
+    submit = SubmitField('Submit')
 
 
 class EditProfileForm(Form):
@@ -9,18 +17,6 @@ class EditProfileForm(Form):
     location = StringField('Location', validators=[Length(0, 64)])
     about_me = TextAreaField('About me')
     submit = SubmitField('Submit')
-
-    def validate(self):
-        if not Form.validate(self):
-            return False
-        if self.nickname.data == self.original_nickname:
-            return True
-        user = User.query.filter_by(nickname=self.nickname.data).first()
-        if user is not None:
-            self.nickname.errors.append('This nickname is already in use. '
-                                        'Please choose another one.')
-            return False
-        return True
 
 
 class EditProfileAdminForm(Form):
@@ -74,6 +70,7 @@ class PostForm(Form):
     sold = BooleanField('Sold?')
     body = PageDownField("Post", validators=[Required()])
     submit = SubmitField('Submit')
+
 
 class CommentForm(Form):
     body = PageDownField('Enter your comment', validators=[Required()])
