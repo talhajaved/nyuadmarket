@@ -240,9 +240,6 @@ def unfollow(nickname):
     flash('You have stopped following ' + nickname + '.')
     return redirect(url_for('user', nickname=nickname))
 
-
-
-
 @main.route('/post/<int:id>', methods=['GET', 'POST'])
 @login_required
 def post(id):
