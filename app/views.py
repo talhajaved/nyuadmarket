@@ -280,3 +280,28 @@ def new_post():
         flash('The post has been added.')
         return redirect(url_for('.post', id=post.id))
     return render_template('new_post.html', form=form)
+
+@main.route('/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit(id):
+    post = Post.query.get_or_404(id)
+    if current_user != post.author and \
+            not current_user.can(Permission.ADMINISTER):
+        abort(403)
+    form = PostForm()
+    if form.validate_on_submit():
+        post.item = form.item.data
+        post.body = form.body.data
+        post.price = form.price.data
+        post.contact = form.contact.data
+        post.sold = form.sold.data
+        db.session.add(post)
+        flash('The post has been updated.')
+        return redirect(url_for('.post', id=post.id))
+    form.item.data = post.item
+    form.body.data = post.body
+    form.price.data = post.price
+    form.contact.data = post.contact
+    form.sold.data = post.sold
+    return render_template('edit_post.html', form=form)
+
